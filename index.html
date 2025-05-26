@@ -227,13 +227,15 @@
   }
 
   // Lose a life
-  function loseLife() {
-    lives--;
-    livesDisplay.textContent = lives;
-    if (lives <= 0) {
-      endGame();
-    }
+ function loseLife() {
+  if (gameEnded) return; // Prevent losing life if the game has ended
+  
+  lives--;
+  livesDisplay.textContent = lives;
+  if (lives <= 0) {
+    endGame();
   }
+}
 
   // End the game (only once)
   function endGame() {
