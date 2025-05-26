@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Catch the Emoji!</title>
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    #home-page, #level-select, #game-page {
+      text-align: center;
+      margin-top: 100px;
+    }
+    #level-select, #game-page {
+      display: none;
+    }
+    button {
+      margin: 5px;
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    .high-score-label {
+      font-size: 14px;
+      color: #555;
+      margin-left: 8px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Home Page -->
+  <div id="home-page">
+    <h1>Welcome to Catch the Emoji!</h1>
+    <button id="start-game-btn">Start Game</button>
+  </div>
+
+  <!-- Level Selection -->
+  <div id="level-select">
+    <h2>Select Level</h2>
+    <button class="level-btn" data-level="1">Level 1 - Normal <span class="high-score-label" id="high-score-1"></span></button>
+    <button class="level-btn" data-level="2">Level 2 - Faster <span class="high-score-label" id="high-score-2"></span></button>
+    <button class="level-btn" data-level="3">Level 3 - Fastest <span class="high-score-label" id="high-score-3"></span></button>
+    <br/>
+    <button id="mute-toggle-btn">🔇 Mute Music</button>
+  </div>
+
+<!-- Game page -->
+  <div id="game-page">
+    <h1>Catch the Emoji!</h1>
+    <div id="countdown" class="countdown">3</div>
+    <p>Score: <span id="score">0</span> | Lives: <span id="lives">3</span></p>
+    <div id="game-area"></div>
+
+    <button id="back-to-home-btn" style="margin: 10px;">Back to Home</button>
+
+    <!-- Game over -->
+    <div id="game-over" class="hidden">
+      <h2>Game Over!</h2>
+      <p>Your score: <span id="final-score">0</span></p>
+      <button onclick="restartGame()">Play Again</button>
+      <button id="return-level-select-btn">Return to Level Select</button>
+    </div>
+
+    <audio id="catch-sound" src="catch.mp3" preload="auto"></audio>
+    <audio id="gameover-sound" src="game-over.mp3" preload="auto"></audio>
+    <audio id="bg-music" src="background-music.mp3" loop preload="auto"></audio>
+  </div>
+
+<script>
+  let score = 0;
+  let lives = 3;
+  let fallSpeed = 2;
+  let emojiInterval = 1000;
+  let emojiSpawner;
+  let currentLevel = 1;
+  let gameEnded = false; // Prevent multiple game-over triggers
+  let bgMusicMuted = false;
+
+  // DOM elements
+  const homePage = document.getElementById("home-page");
+  const levelSelect = document.getElementById("level-select");
+  const gamePage = document.getElementById("game-page");
+  const startGameBtn = document.getElementById("start-game-btn");
+  const backToHomeBtn = document.getElementById("back-to-home-btn");
+  const returnLevelSelectBtn = document.getElementById("return-level-select-btn");
+  const muteToggleBtn = document.getElementById("mute-toggle-btn");
+
+  const gameArea = document.getElementById("game-area");
+  const scoreDisplay = document.getElementById("score");
+  const livesDisplay = document.getElementById("lives");
+  const gameOverScreen = document.getElementById("game-over");
+  const finalScore = document.getElementById("final-score");
+  const countdownDisplay = document.getElementById("countdown");
+
+  const catchSound = document.getElementById("catch-sound");
+  const gameoverSound = document.getElementById("gameover-sound");
+  const bgMusic = document.getElementById("bg-music");
+
+  // Show saved high scores on level select buttons
+  function updateHighScoresDisplay() {
+    for (let lvl = 1; lvl <= 3; lvl++) {
+      const highScore = localStorage.getItem(`emojiHighScore_level${lvl}`) || 0;
+      document.getElementById(`high-score-${lvl}`).textContent = `(High Score: ${highScore})`;
+    }
+  }
+  updateHighScoresDisplay();
+
+  document.addEventListener('click', function unlockAudio() {
+    bgMusic.play().then(() => bgMusic.pause()).catch(() => {});
+    gameoverSound.play().then(() => gameoverSound.pause()).catch(() => {});
+    catchSound.play().then(() => catchSound.pause()).catch(() => {});
+    document.removeEventListener('click', unlockAudio);
+  });
+
+  // Mute toggle for background music
+  muteToggleBtn.addEventListener("click", () => {
+    bgMusicMuted = !bgMusicMuted;
+    bgMusic.muted = bgMusicMuted;
+    muteToggleBtn.textContent = bgMusicMuted ? "🔊 Unmute Music" : "🔇 Mute Music";
+  });
+
+  // Start game
+  startGameBtn.addEventListener("click", () => {
+    homePage.style.display = "none";
+    levelSelect.style.display = "block";
+  });
+
+  // Level select
+  document.querySelectorAll(".level-btn").forEach(button => {
+    button.addEventListener("click", () => {
+      currentLevel = parseInt(button.getAttribute("data-level"));
+      setLevel(currentLevel);
+
+      lives = 3;
+      score = 0;
+      livesDisplay.textContent = lives;
+      scoreDisplay.textContent = score;
+
+      levelSelect.style.display = "none";
+      gamePage.style.display = "block";
+      startCountdown();
+
+      if (!bgMusicMuted) {
+        bgMusic.currentTime = 0;
+        bgMusic.play().catch(() => {});
+      }
+    });
+  });
+
+  // Back to home
+  backToHomeBtn.addEventListener("click", () => {
+    endGameCleanup();
+    gameOverScreen.classList.add("hidden");
+    gamePage.style.display = "none";
+    homePage.style.display = "block";
+    bgMusic.pause();
+  });
+
+  // Return to level select
+  returnLevelSelectBtn.addEventListener("click", () => {
+    endGameCleanup();
+    gameOverScreen.classList.add("hidden");
+    gamePage.style.display = "none";
+    levelSelect.style.display = "block";
+    bgMusic.pause();
+  });
+
+  // Set level difficulty
+  function setLevel(level) {
+    if (level === 1) {
+      fallSpeed = 2;
+      emojiInterval = 1000;
+    } else if (level === 2) {
+      fallSpeed = 4;
+      emojiInterval = 700;
+    } else if (level === 3) {
+      fallSpeed = 6;
+      emojiInterval = 400;
+    }
+  }
+
+  // Generate random emoji
+  function randomEmoji() {
+    const emojis = ["🍕", "⚽", "❤️", "⭐", "🐶", "🍔", "🌈", "🎮", "🔥"];
+    return emojis[Math.floor(Math.random() * emojis.length)];
+  }
+
+  // Create emoji element
+  function createEmoji() {
+    const emoji = document.createElement("div");
+    emoji.classList.add("emoji");
+    emoji.textContent = randomEmoji();
+    emoji.style.left = Math.random() * 90 + "%";
+    emoji.style.top = "0px";
+
+    gameArea.appendChild(emoji);
+
+    let speed = fallSpeed + Math.random() * 2;
+    const fall = setInterval(() => {
+      const currentTop = parseInt(emoji.style.top);
+      if (currentTop < 500) {
+        emoji.style.top = currentTop + speed + "px";
+      } else {
+        clearInterval(fall);
+        if (gameArea.contains(emoji)) {
+          gameArea.removeChild(emoji);
+        }
+        loseLife();
+      }
+    }, 20);
+
+    emoji.addEventListener("click", () => {
+      catchSound.currentTime = 0;
+      catchSound.play();
+      score++;
+      scoreDisplay.textContent = score;
+      clearInterval(fall);
+      if (gameArea.contains(emoji)) {
+        gameArea.removeChild(emoji);
+      }
+
+      if (score % 5 === 0 && fallSpeed < 7) {
+        fallSpeed += 0.5;
+        if (emojiInterval > 300) emojiInterval -= 50;
+        resetInterval();
+      }
+    });
+  }
+
+  // Lose a life
+  function loseLife() {
+    lives--;
+    livesDisplay.textContent = lives;
+    if (lives <= 0) {
+      endGame();
+    }
+  }
+
+  // End the game (only once)
+  function endGame() {
+    if (gameEnded) return;
+    gameEnded = true;
+
+    clearInterval(emojiSpawner);
+    document.querySelectorAll(".emoji").forEach(e => e.remove());
+
+    gameOverScreen.classList.remove("hidden");
+    finalScore.textContent = score;
+
+    // Save high score for current level
+    const savedHighScore = localStorage.getItem(`emojiHighScore_level${currentLevel}`) || 0;
+    if (score > savedHighScore) {
+      localStorage.setItem(`emojiHighScore_level${currentLevel}`, score);
+      updateHighScoresDisplay();
+    }
+
+    try {
+      gameoverSound.pause();
+      gameoverSound.currentTime = 0;
+      gameoverSound.play();
+    } catch (e) {
+      console.error("Game over sound failed to play:", e);
+    }
+
+    bgMusic.pause();
+  }
+
+  // Cleanup/reset game
+  function endGameCleanup() {
+    clearInterval(emojiSpawner);
+    document.querySelectorAll(".emoji").forEach(e => e.remove());
+    lives = 3;
+    score = 0;
+    scoreDisplay.textContent = score;
+    livesDisplay.textContent = lives;
+    fallSpeed = 2;
+    emojiInterval = 1000;
+    gameEnded = false;
+  }
+
+  // Restart game
+  function restartGame() {
+    endGameCleanup();
+    gameOverScreen.classList.add("hidden");
+    startCountdown();
+
+    // Restart bg music if not muted
+    if (!bgMusicMuted) {
+      bgMusic.currentTime = 0;
+      bgMusic.play().catch(() => {});
+    }
+  }
+
+  function resetInterval() {
+    clearInterval(emojiSpawner);
+    emojiSpawner = setInterval(createEmoji, emojiInterval);
+  }
+
+  function startCountdown() {
+    let count = 3;
+    countdownDisplay.textContent = count;
+    countdownDisplay.classList.remove("hidden");
+
+    const countdownInterval = setInterval(() => {
+      count--;
+      if (count > 0) {
+        countdownDisplay.textContent = count;
+      } else {
+        clearInterval(countdownInterval);
+        countdownDisplay.classList.add("hidden");
+        startGame();
+      }
+    }, 1000);
+  }
+
+  function startGame() {
+    resetInterval();
+  }
+</script>
+</body>
+</html>

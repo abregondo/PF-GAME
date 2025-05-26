@@ -1,0 +1,67 @@
+body {
+  font-family: 'Segoe UI', sans-serif;
+  text-align: center;
+  background-color: #fdf6e3;
+}
+
+#game-area {
+  width: 100%;
+  height: 500px;
+  position: relative;
+  overflow: hidden;
+  border: 3px solid #ffcc00;
+  background-color: #fff3cd;
+  margin: auto;
+  max-width: 500px;
+}
+
+.emoji {
+  position: absolute;
+  font-size: 30px;
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+
+.emoji:hover {
+  transform: scale(1.2);
+}
+
+#game-over {
+  position: absolute;
+  top: 40%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: #ffffff;
+  padding: 30px;
+  border: 2px solid #ff9800;
+  border-radius: 12px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+}
+
+.hidden {
+  display: none;
+}
+
+button {
+  padding: 10px 20px;
+  background-color: #ff9800;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.countdown {
+  font-size: 80px;
+  font-weight: bold;
+  color: #ff6f00;
+  position: absolute;
+  top: 40%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 10;
+}
+
+.hidden {
+  display: none;
+}
